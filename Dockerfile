@@ -1,32 +1,61 @@
+# syntax=docker/dockerfile:1
+
+# ============================================================
+# Stage 1 - Litestream oficial
+# ============================================================
+FROM litestream/litestream:latest AS litestream
+
+# ============================================================
+# Stage 2 - 9Router
+# ============================================================
 FROM decolua/9router:latest
 
 USER root
 
-# Instala dependências mínimas
-RUN apk add --no-cache \
-    ca-certificates \
-    wget \
-    tar
+# O Litestream é um binário estático.
+# A imagem oficial disponibiliza o binário neste caminho.
+COPY --from=litestream /usr/local/bin/litestream /usr/local/bin/litestream
 
-# Baixa o Litestream v0.5.16 para Linux amd64
-RUN wget -O /tmp/litestream.tar.gz \
-    https://github.com/benbjohnson/litestream/releases/download/v0.5.16/litestream-0.5.16-linux-amd64.tar.gz \
-    && mkdir -p /tmp/litestream \
-    && tar -xzf /tmp/litestream.tar.gz -C /tmp/litestream \
-    && install -m 0755 /tmp/litestream/litestream /usr/local/bin/litestream \
-    && rm -rf /tmp/litestream /tmp/litestream.tar.gz \
+# Verificação durante o build.
+RUN chmod +x /usr/local/bin/litestream \
     && /usr/local/bin/litestream version
 
-# Configuração do Litestream
+# ============================================================
+# Arquivos da nossa integração
+# ============================================================
+
 COPY litestream.yml /etc/litestream.yml
+COPY entrypoint.sh /entrypoint-b2.sh
 
-# Nosso entrypoint
-COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint-b2.sh
 
-RUN chmod +x /entrypoint.sh
+# ============================================================
+# Configuração padrão do 9Router
+# ============================================================
 
 WORKDIR /app
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENV NODE_ENV=production
+ENV PORT=20128
+ENV HOSTNAME=0.0.0.0
+ENV DATA_DIR=/app/data
+ENV NEXT_TELEMETRY_DISABLED=1
+
+EXPOSE 20128
+
+# ============================================================
+# IMPORTANTE:
+#
+# O entrypoint-b2.sh fará:
+#
+# 1. Preparação do diretório
+# 2. Verificação do SQLite
+# 3. Restore do B2, se necessário
+# 4. Somente depois inicia Litestream + 9Router
+#
+# Assim o restore NÃO concorre com o 9Router em memória.
+# ============================================================
+
+ENTRYPOINT ["/entrypoint-b2.sh"]
 
 CMD ["node", "server.js"]
