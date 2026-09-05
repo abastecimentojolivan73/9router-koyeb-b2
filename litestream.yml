@@ -1,0 +1,30 @@
+# Litestream v0.5.x configuration for Backblaze B2 (S3-compatible API).
+# Credentials are intentionally provided through Koyeb environment variables.
+
+access-key-id: ${B2_KEY_ID}
+secret-access-key: ${B2_APPLICATION_KEY}
+
+# Keep the local tracking metadata inside the ephemeral container.
+meta-dir: /app/data/.litestream
+
+# Conservative settings for a 512 MB Koyeb instance.
+logging:
+  level: info
+  type: text
+  stderr: true
+
+snapshot:
+  interval: 24h
+  retention: 168h
+
+# The 9Router project documents this as its main SQLite database.
+dbs:
+  - path: /app/data/db/data.sqlite
+    replica:
+      type: s3
+      bucket: ${B2_BUCKET}
+      path: 9router/database
+      endpoint: ${B2_ENDPOINT}
+      region: ${B2_REGION}
+      force-path-style: true
+      sync-interval: 10s
