@@ -2,30 +2,25 @@ FROM decolua/9router:latest
 
 USER root
 
-ARG LITESTREAM_VERSION=0.5.16
+# Instala dependências mínimas
+RUN apk add --no-cache \
+    ca-certificates \
+    wget \
+    tar
 
-# TARGETARCH é fornecido automaticamente pelo Docker Buildx/Koyeb.
-ARG TARGETARCH=amd64
+# Baixa o Litestream v0.5.16 para Linux amd64
+RUN wget -O /tmp/litestream.tar.gz \
+    https://github.com/benbjohnson/litestream/releases/download/v0.5.16/litestream-0.5.16-linux-amd64.tar.gz \
+    && mkdir -p /tmp/litestream \
+    && tar -xzf /tmp/litestream.tar.gz -C /tmp/litestream \
+    && install -m 0755 /tmp/litestream/litestream /usr/local/bin/litestream \
+    && rm -rf /tmp/litestream /tmp/litestream.tar.gz \
+    && /usr/local/bin/litestream version
 
-RUN set -eux; \
-    apk add --no-cache ca-certificates wget tar su-exec; \
-    case "${TARGETARCH}" in \
-        amd64) ARCH="amd64" ;; \
-        arm64) ARCH="arm64" ;; \
-        *) echo "Arquitetura não suportada: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
-    echo "Baixando Litestream v${LITESTREAM_VERSION} para ${ARCH}..."; \
-    wget -q -O /tmp/litestream.tar.gz https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-${ARCH}.tar.gz; \
-    mkdir -p /tmp/litestream; \
-    tar -xzf /tmp/litestream.tar.gz -C /tmp/litestream; \
-    install -m 0755 /tmp/litestream/litestream /usr/local/bin/litestream; \
-    rm -rf /tmp/litestream /tmp/litestream.tar.gz; \
-    litestream version
-
-# Configuração
+# Configuração do Litestream
 COPY litestream.yml /etc/litestream.yml
 
-# Entrypoint personalizado
+# Nosso entrypoint
 COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
